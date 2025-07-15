@@ -65,6 +65,8 @@ export GOOGLE_APPLICATION_CREDENTIALS="path/to/your/service-account.json"
 export GOOGLE_CLOUD_PROJECT_ID="your-google-cloud-project-id"
 ```
 
+**Note**: The `GCSClient` uses service account authentication and requires the `GOOGLE_APPLICATION_CREDENTIALS` environment variable to be set.
+
 ### 4. Verify Installation
 
 ```bash
@@ -160,7 +162,7 @@ runner.run(suite)
 
 - **Function tested**: `GCSClient.create_bucket()`
 - **Expected behavior**: Returns `True` if bucket creation succeeds, `False` otherwise
-- **Test bucket name**: `test-bucket-integration`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires GCS write permissions
 
 ### 2. `test_list_buckets`
@@ -177,7 +179,7 @@ runner.run(suite)
 
 - **Function tested**: `GCSClient.bucket_exists()`
 - **Expected behavior**: Returns `True` if the test bucket exists
-- **Test bucket name**: `test-bucket-integration`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the test bucket to exist (run `test_create_bucket` first)
 
 ### 4. `test_list_files`
@@ -186,7 +188,7 @@ runner.run(suite)
 
 - **Function tested**: `GCSClient.list_files()`
 - **Expected behavior**: Returns a list of file names in the bucket
-- **Test bucket name**: `test-bucket-integration`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the test bucket to exist and contain files
 
 ### 5. `test_upload_file`
@@ -196,6 +198,7 @@ runner.run(suite)
 - **Function tested**: `GCSClient.upload_file()`
 - **Expected behavior**: Returns `True` if upload succeeds
 - **Test file**: `env.example` (local file)
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the test bucket to exist and the local file to be present
 
 ### 6. `test_download_file`
@@ -205,6 +208,7 @@ runner.run(suite)
 - **Function tested**: `GCSClient.download_file()`
 - **Expected behavior**: Returns `True` if download succeeds
 - **Test file**: `env.example` (file in bucket)
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the file to exist in the bucket (run `test_upload_file` first)
 
 ### 7. `test_get_file_metadata`
@@ -214,6 +218,7 @@ runner.run(suite)
 - **Function tested**: `GCSClient.get_file_metadata()`
 - **Expected behavior**: Returns a dictionary with file metadata (name, size, content_type, etc.)
 - **Test file**: `env.example`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the file to exist in the bucket
 
 ### 8. `test_delete_file`
@@ -223,6 +228,7 @@ runner.run(suite)
 - **Function tested**: `GCSClient.delete_file()`
 - **Expected behavior**: Returns `True` if deletion succeeds
 - **Test file**: `env.example`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the file to exist in the bucket
 
 ### 9. `test_delete_bucket`
@@ -231,7 +237,7 @@ runner.run(suite)
 
 - **Function tested**: `GCSClient.delete_bucket()`
 - **Expected behavior**: Returns `True` if deletion succeeds
-- **Test bucket name**: `test-bucket-integration`
+- **Test bucket name**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (includes project ID for uniqueness)
 - **Dependencies**: Requires the bucket to be empty (run `test_delete_file` first)
 
 ## Test Execution Order
@@ -247,6 +253,34 @@ For a complete test run, the tests should be executed in this order due to depen
 7. `test_delete_file` - Deletes the file
 8. `test_delete_bucket` - Deletes the bucket
 
+## GCSClient Implementation Details
+
+The `GCSClient` class provides a simplified interface for Google Cloud Storage operations:
+
+### Authentication
+
+- Uses service account authentication via `GOOGLE_APPLICATION_CREDENTIALS` environment variable
+- Automatically loads credentials from the specified JSON file
+- Supports logging with configurable log levels
+
+### Available Methods
+
+- `create_bucket(bucket_name)` - Creates a new bucket
+- `list_buckets()` - Lists all buckets in the project
+- `bucket_exists(bucket_name)` - Checks if a bucket exists
+- `list_files(bucket_name, prefix="")` - Lists files in a bucket
+- `upload_file(bucket_name, source_file, destination_blob)` - Uploads a file
+- `download_file(bucket_name, source_blob, destination_file)` - Downloads a file
+- `get_file_metadata(bucket_name, blob_name)` - Gets file metadata
+- `delete_file(bucket_name, blob_name)` - Deletes a file
+- `delete_bucket(bucket_name)` - Deletes a bucket
+
+### Error Handling
+
+- All methods return appropriate boolean values or empty lists on failure
+- Comprehensive logging for debugging
+- Graceful handling of permission errors
+
 ## Troubleshooting
 
 ### Common Issues
@@ -255,8 +289,8 @@ For a complete test run, the tests should be executed in this order due to depen
 2. **Authentication errors**: Ensure your service account has the necessary permissions
 3. **Credentials not found**: Check that `GOOGLE_APPLICATION_CREDENTIALS` environment variable is set correctly
 4. **Project ID not set**: Ensure `GOOGLE_CLOUD_PROJECT_ID` environment variable is set
-5. **Bucket already exists**: The test bucket name might already be in use globally
-6. **File not found**: Ensure test files (`env.example`, `gcs_client.py`) exist in the project root
+5. **Bucket already exists**: The test bucket name might already be in use globally (bucket names are globally unique)
+6. **File not found**: Ensure test files (`env.example`) exist in the project root
 7. **Permission denied**: Check that your service account has read/write access to GCS
 8. **Import errors**: Make sure you're running tests from the project root directory with venv activated
 
@@ -274,15 +308,15 @@ The `-s` flag allows print statements to be displayed, which can help with debug
 
 The tests use these files:
 
-- **Local files**: `env.example`, `gcs_client.py` (must exist in project root)
-- **Test bucket**: `test-bucket-integration` (created and deleted during tests)
+- **Local files**: `env.example` (must exist in project root)
+- **Test bucket**: `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` (created and deleted during tests, includes project ID for uniqueness)
 - **Test files**: Same names as local files, uploaded to the test bucket
 
 ## Cleanup
 
 ### Test Cleanup
 
-The tests are designed to clean up after themselves by deleting the test bucket at the end. If tests fail partway through, you may need to manually delete the `test-bucket-integration` bucket from your GCS console.
+The tests are designed to clean up after themselves by deleting the test bucket at the end. If tests fail partway through, you may need to manually delete the `test-bucket-integration-{GOOGLE_CLOUD_PROJECT_ID}` bucket from your GCS console.
 
 ### Virtual Environment Cleanup
 
